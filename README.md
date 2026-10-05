@@ -561,6 +561,12 @@ come down. It is the first dial to reach for.
   **Recently Deleted and stay recoverable for 30 days**. There are two confirmations:
   the app's own sheet, then iOS's ("Allow OneShot to delete N photos?"). Verified in
   the simulator — the system sheet appears there too.
+- Deleting from a **folder** goes through `FileManager.trashItem`, so those files land
+  in the volume's trash and can be put back too. Where a volume has no trash — some
+  external drives — the move fails and the user is told, rather than the file being
+  unlinked quietly behind the promise above.
+- A folder is read with no photo library permission at all. The gate in front of the
+  library is not a gate in front of the app.
 
 ---
 
