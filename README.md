@@ -12,6 +12,80 @@ runs inside the app.
 
 ---
 
+## Getting started
+
+Qdrant does not publish a Swift package yet, so the vector engine is **built from
+source once** before the project will compile. A fresh clone will not build until the
+script below has run: `Packages/QdrantEdge/QdrantEdge.xcframework` and the generated
+Swift binding are kept out of the repository because they are large and fully
+reproducible from a pinned commit.
+
+### What you need
+
+| Requirement | Why |
+| --- | --- |
+| **macOS on Apple silicon** | The engine is cross-compiled for `aarch64-apple-ios` and `aarch64-apple-ios-sim` only, so an Intel Mac has no simulator slice to run. |
+| **Xcode 26 or later** | iOS 26 deployment target, Swift 6 strict concurrency. |
+| **`rustup`** | The engine is Rust. The script installs the pinned nightly toolchain and both iOS targets itself — rustup only has to be present. |
+| **`git` and `perl`** | Both arrive with Xcode's command line tools: `xcode-select --install`. |
+| **~6 GB free disk** | Cargo's build directory, `.build/qdrant-edge`. Safe to delete once the package exists. |
+
+If you do not have rustup:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Open a new terminal afterwards so `rustup` is on your `PATH`.
+
+### Build the engine, then run the app
+
+```bash
+cd "iOS (Qdrant Edge)"
+Scripts/build-qdrant-edge.sh
+open OneShot.xcodeproj
+```
+
+The first run takes roughly **10 minutes**. It shallow-clones a pinned commit of
+Qdrant's Swift SDK pull request, cross-compiles the Rust crate for both iOS targets,
+generates the Swift binding with UniFFI, and assembles the XCFramework into
+`Packages/QdrantEdge`. Later runs reuse the compiled slices and finish in seconds.
+
+Then pick an iOS 26 simulator or a connected device in Xcode and press ⌘R. On a
+device you will also need your own signing team selected — see [DEPLOY.md](DEPLOY.md).
+
+On first launch, allow full photo library access. Limited access cannot work: a
+duplicate is a relationship between two photos, so the app has to be able to see both.
+To scan without granting the library at all, choose **Scan a folder instead** and pick
+any folder from Files — including a USB drive or SD card plugged into the device.
+
+### If something goes wrong
+
+| Symptom | What to do |
+| --- | --- |
+| `error: 'rustup' not found` | Install rustup as above, then open a new terminal. |
+| Xcode cannot resolve the `QdrantEdge` package | The script has not run, or did not finish. Run it again; `--clean` forces every slice to rebuild from scratch. |
+| The disk fills up mid-build | Re-run with `--prune`, which deletes each target's intermediates as soon as its slice is copied out. |
+| You need a different nightly | `QDRANT_EDGE_TOOLCHAIN=nightly-YYYY-MM-DD Scripts/build-qdrant-edge.sh`. The pin exists so that a rebuild reproduces the same library — change it deliberately. |
+| The build worked but the app will not launch on a device | iOS 26 is the minimum. Check the destination, and that Developer Mode is enabled on the phone. |
+
+Nothing is fetched at runtime. Once the engine is linked in, the app still works in
+aeroplane mode — the build is the only step that touches the network.
+
+### Running the tests
+
+```bash
+xcodebuild test -project OneShot.xcodeproj -scheme OneShot \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+`OneShotTests` exercises the detection pipeline against a synthetic corpus with known
+ground truth, so it needs the engine built first like everything else. What those
+tests actually measure, and how to run the ones that need a seeded photo library, is
+under [The test suite](#the-test-suite-oneshottests).
+
+---
+
 ## How detection works
 
 Five phases, in `Engine/DuplicateScanner.swift`.
@@ -517,21 +591,27 @@ Scripts/             build-qdrant-edge.sh
 Design/              App icon source artwork, and PrepIcon.swift which crops it to AppIcon1024.png
 ```
 
-## Building
+## Building Qdrant Edge from source
 
-Qdrant Edge has no released Swift package yet, so it is built from source once,
-before the project will compile:
+The steps are under [Getting started](#getting-started); this is what the script
+actually does, and why it exists at all.
 
-```bash
-Scripts/build-qdrant-edge.sh
+Qdrant's Swift SDK is an open pull request ([qdrant/qdrant#9979]) on top of the merged
+UniFFI crate `qdrant-edge-ffi`, so there is no package to depend on. The script builds
+that crate from a pinned commit of the pull request's branch, with a pinned nightly
+toolchain — the workspace needs unstable std features — and produces two files, both
+git-ignored:
+
+```
+Packages/QdrantEdge/QdrantEdge.xcframework          ios-arm64 + ios-arm64-simulator
+Packages/QdrantEdge/Sources/QdrantEdge/QdrantEdge.swift   the generated binding
 ```
 
-It clones a pinned commit of Qdrant's Swift SDK pull request, cross-compiles the
-Rust engine for iOS devices and the Apple-silicon simulator with a pinned nightly
-toolchain, generates the Swift binding with UniFFI and assembles
-`Packages/QdrantEdge/QdrantEdge.xcframework`. Allow about 10 minutes and several GB
-in `.build/qdrant-edge` (pass `--prune` on a tight disk). Later runs reuse the built
-slices and finish in seconds.
+`--no-default-features` drops the O(n²) `search_matrix` operation, as Qdrant's own
+mobile build does. Bump `QDRANT_COMMIT` deliberately: the Swift API is generated, and
+Qdrant Edge is in beta.
+
+[qdrant/qdrant#9979]: https://github.com/qdrant/qdrant/pull/9979
 
 It needs `rustup`; the toolchain and iOS targets are installed on demand. The
 XCFramework is ~330 MB per slice as a static library, but linking strips it: Qdrant
