@@ -1,0 +1,21 @@
+# Xcode build output
+build/
+DerivedData/
+
+# Per-user Xcode state: window layout, breakpoints, the scheme list
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Qdrant Edge — produced by Scripts/build-qdrant-edge.sh, not written by hand.
+# Package.swift stays tracked; these two are its output and are large.
+Packages/QdrantEdge/QdrantEdge.xcframework/
+Packages/QdrantEdge/Sources/QdrantEdge/QdrantEdge.swift
+
+# macOS
+.DS_Store
