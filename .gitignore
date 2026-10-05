@@ -17,5 +17,9 @@ xcuserdata/
 Packages/QdrantEdge/QdrantEdge.xcframework/
 Packages/QdrantEdge/Sources/QdrantEdge/QdrantEdge.swift
 
+# JetBrains project config
+.idea/
+*.iml
+
 # macOS
 .DS_Store
